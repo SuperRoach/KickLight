@@ -29,9 +29,9 @@ class KickLight:
 
         # The following data does not change between each command.
         self.Marker = 'RL'
-        self.SlaveAddress = '\x00\x00\x00\x00'
+        self.SlaveAddress = 0
         self.IpAddress = "169.254.255.255"
-        self.live = False
+        self.live = True
         if self.live:
             self.Sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.ServerAddress = ('169.254.255.255', 8080)
@@ -50,36 +50,70 @@ class KickLight:
         # Typical values are between 2500 and 10000.
 
         # This is the data command to change the colour temp.
-        self.Command = '\x05'
+        self.Command = 5
 
         #self.Data = '\x1000'   # 200 in int
-        self.Data = hex(temp)
+        self.Data = temp
         self.SendCommand()
         return 'color temp %s is %r in hex.' % (temp, self.Data)
 
     def brightness(self, intensity):
-        # Set's the brightness level
+        # Sets the brightness level
 
-        self.Command = '\x06'
-        self.Data = hex(intensity)
+        self.Command = 6
+        self.Data = intensity
         self.SendCommand()
+
+    def rgbtest(self, *args):
+        # Sets the RGB - device dependant and not calibrated, for testing only.
+        # Takes Three Bytes
+
+        if len(args) == 3:
+            self.Command = 1
+            self.Data = args
+            self.SendCommand()
+        else:
+            print 'Supply Three bytes for R G B'
+
+    def buttonmode(self, mode):
+        # Changes how the buttons on the Kick function
+        # 0 = normal
+        # 1 = Brightness / Refresh
+        # 2 = Demo buttons
+        #
+        # When powered off, the buttons go back to normal.
+        # Sets the brightness level
+
+        self.Command = 10
+        self.Data = mode
+        self.SendCommand()            
+
 
     def SendCommand(self):
         # You need to set data before this at the moment.
 
         # Hardcoded. 
-        self.Length = Length = '\x00\x03' # High byte plus length of data +1 for the command.
+        #self.Length = Length = '\x00\x02' # High byte plus length of data +1 for the command.
 
-
+        self.Length = 4
         #self.Length = Length = len(self.Data) # It should be high byte and low byte. Data Length + 1 for command
-        #self.Length = '\x00', str(len(self.Data) + 1)
+        #self.Length = len(self.Data)
         #self.Length = '\x00', str(1+1)
         
-        print 'The length of the data is apparently %s' % (str(len(self.Data) + 1))
+        #print 'The length of the data is apparently %s' % (len(str((self.Data) + 1)))
         values = (self.Marker, self.SlaveAddress, self.Length, self.Command, self.Data)
 
         # Am I correctly setting the length? (third value should be two bytes.)
-        Packer = struct.Struct('2s 4s 2s 2s 2s')
+        #Packer = struct.Struct('2s 4s 1h 1i 1i')
+        if self.Command == 1: #RGB Test
+            Packer = struct.Struct('> 2s i h b 3B')
+        elif self.Command == 5: # Colour Temp
+            Packer = struct.Struct('> 2s i h b h')
+        elif self.Command == 6: # Brightness
+            Packer = struct.Struct('> 2s i h b B')
+        elif self.Command == 10: # Button function
+            Packer = struct.Struct('> 2s i h b B')
+            
         PackedData = Packer.pack(*values)
         
         try:
